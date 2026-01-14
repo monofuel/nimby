@@ -31,6 +31,7 @@ type
 var
   verbose: bool = false
   global: bool = false
+  force: bool = false
   source: bool = false
   updatedGlobalPackages: bool = false
   timeStarted: float64
@@ -167,6 +168,7 @@ proc writeHelp() =
   print "Usage: nimby <subcommand> [options]"
   print "  ~ Minimal package manager for Nim. ~"
   print "    -g, --global Install packages in the ~/.nimby/pkgs directory"
+  print "    -f, --force Allow installing into the current directory"
   print "    -v, --version print the version of Nimby"
   print "    -h, --help show this help message"
   print "    -V, --verbose print verbose output"
@@ -184,6 +186,34 @@ proc writeHelp() =
 proc getGlobalPackagesDir(): string =
   ## Get the global packages directory.
   "~/.nimby/pkgs".expandTilde()
+
+proc hasLocalNimble(): bool =
+  ## Check if the current directory has a .nimble file.
+  for kind, path in walkDir("."):
+    if kind == pcFile and path.endsWith(".nimble"):
+      return true
+
+proc parentHasNimbyConfig(): bool =
+  ## Check if the parent directory has a Nimby nim.cfg file.
+  let parent = getCurrentDir().parentDir()
+  if parent.len == 0:
+    return false
+  let configPath = parent / "nim.cfg"
+  if not fileExists(configPath):
+    return false
+  let nimCfg = readFileSafe(configPath)
+  return nimCfg.contains("# Created by Nimby")
+
+proc ensureLocalInstallRoot() =
+  ## Ensure local installs are not inside another Nimby workspace.
+  if global or force:
+    return
+  if not hasLocalNimble():
+    return
+  if not parentHasNimbyConfig():
+    return
+  let parent = getCurrentDir().parentDir()
+  quit("This folder looks like a package inside a Nimby workspace. Run nimby from: " & parent & " or pass --force to install here.")
 
 proc parseNimbleFile*(fileName: string): NimbleFile =
   ## Parse the .nimble file and return a NimbleFile object.
@@ -459,6 +489,7 @@ proc fetchPackage(argument: string) =
 
 proc installPackage(argument: string) =
   ## Install a package.
+  ensureLocalInstallRoot()
   timeStart()
   print &"Installing package: {argument}"
 
@@ -604,6 +635,7 @@ proc lockPackage(argument: string) =
 
 proc syncPackage(path: string) =
   ## Synchronize packages from a lock file.
+  ensureLocalInstallRoot()
   info &"Syncing lock file: {path}"
   timeStart()
 
@@ -750,6 +782,8 @@ when isMainModule:
         if not dirExists(getGlobalPackagesDir()):
           info &"Creating global packages directory: {getGlobalPackagesDir()}"
           createDir(getGlobalPackagesDir())
+      of "force", "f":
+        force = true
       of "source", "s":
         source = true
       else:

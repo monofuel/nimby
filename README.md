@@ -74,6 +74,8 @@ Not everyone develops like this, though. Sometimes you just need a tool globally
 
 The global option works for both `nimby install -g` and even more importantly `nimby sync -g` when you’re working with lock files. That’s really all there is to it.
 
+If you run `nimby install` or `nimby sync` from inside a repo that lives under a Nimby workspace, it will stop and tell you to run from the workspace root. This avoids accidentally cloning a full dependency tree into the repo itself. Use `--force` or `-f` to override when you really want to install in that directory.
+
 ## What? It also installs Nim itself?
 
 Yeah, installing Nim is actually pretty easy. You just copy a couple of folders, put them in the right place, and add `~/.nimby/nim/bin` to your system path. That’s it.
